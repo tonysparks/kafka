@@ -151,6 +151,53 @@ public class RocksDBSessionStoreTest {
         assertEquals(session3, results.next().key);
         assertFalse(results.hasNext());
     }
+    
+    
+    @Test
+    public void shouldFetchBigExactKeys() {
+        final RocksDBSegmentedBytesStore bytesStore =
+                new RocksDBSegmentedBytesStore("session-store", 0x7a00000000000000L, 2, new SessionKeySchema());
+
+        sessionStore = new RocksDBSessionStore<>(bytesStore,
+                                                 Serdes.String(),
+                                                 Serdes.Long());
+
+        sessionStore.init(context, sessionStore);
+
+        sessionStore.put(new Windowed<>("abcdefg", new SessionWindow(0, 0)), 1L);
+        sessionStore.put(new Windowed<>("aaddee", new SessionWindow(0, 0)), 2L);
+        sessionStore.put(new Windowed<>("abcdefg", new SessionWindow(10, 20)), 3L);
+        sessionStore.put(new Windowed<>("aaddee", new SessionWindow(10, 20)), 4L);
+        sessionStore.put(new Windowed<>("abcdefg", new SessionWindow(0x7a00000000000000L - 2, 0x7a00000000000000L - 1)), 5L);
+
+        KeyValueIterator<Windowed<String>, Long> iterator = sessionStore.findSessions("abcdefg", "abcdefg", 0, Long.MAX_VALUE);
+        List<Long> results = new ArrayList<>();
+        while (iterator.hasNext()) {
+            results.add(iterator.next().value);
+        }
+
+        assertThat(results, equalTo(Arrays.asList(1L, 3L, 5L)));
+
+
+        iterator = sessionStore.findSessions("aaddee", 0, Long.MAX_VALUE);
+        results = new ArrayList<>();
+        while (iterator.hasNext()) {
+            results.add(iterator.next().value);
+        }
+
+        assertThat(results, equalTo(Arrays.asList(2L, 4L)));
+
+
+        final KeyValueIterator<Windowed<String>, Long> rangeIterator = sessionStore.findSessions("abcdefg", "aaddee", 0, Long.MAX_VALUE);
+        final List<Long> rangeResults = new ArrayList<>();
+        while (rangeIterator.hasNext()) {
+            rangeResults.add(rangeIterator.next().value);
+        }
+        // FAILS
+        assertThat(rangeResults, equalTo(Arrays.asList(1L, 3L, 2L, 4L, 5L)));
+    }
+
+    
 
     @Test
     public void shouldFetchExactKeys() {

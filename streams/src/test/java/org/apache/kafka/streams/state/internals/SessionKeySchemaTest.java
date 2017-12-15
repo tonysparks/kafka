@@ -97,6 +97,17 @@ public class SessionKeySchemaTest {
                 )
             ) >= 0
         );
+        
+        assertThat(
+                "shorter key with max timestamp should be in range",
+                upper.compareTo(
+                    SessionKeySerde.bytesToBinary(
+                        new Windowed<>(
+                            Bytes.wrap(new byte[]{0xA, 0xB}),
+                            new SessionWindow(0, Long.MAX_VALUE))
+                    )
+                ) >= 0
+            );
 
         assertThat(upper, equalTo(SessionKeySerde.bytesToBinary(
             new Windowed<>(Bytes.wrap(new byte[]{0xA}), new SessionWindow(Long.MAX_VALUE, Long.MAX_VALUE))))
